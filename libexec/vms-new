@@ -146,7 +146,6 @@ generate_config() {
 prepare_os_disk() {
   if [[ ! -z $VERBOSE ]]; then
     echo "Creating disk volume ${NEW_VM["NAME"]} from ${NEW_VM["OS_VARIANT"]} cloud image and resizing it to ${NEW_VM["DISK"]}G"
-    echo
   fi
   # :FIXME: replace cloud image name with variable NEW_VM["OS_VARIANT"]
   # :FIXME: This will require renaming the cloudimages in the volume pool
@@ -159,7 +158,6 @@ prepare_os_disk() {
 prepare_seed_disk() {
   if [[ ! -z $VERBOSE ]]; then
     echo "Creating a virtual cdrom with ${NEW_VM["NAME"]}.metadata, ${NEW_VM["NAME"]}.netplan & ${NEW_VM["NAME"]}.cloudinit"
-    echo
   fi
   IMGFILE="${NEW_VM["TMPDIR"]}/seed.iso"
   IMGSIZE=$(qemu-img info --output json ${IMGFILE} | jq -r .[\"virtual-size\"])
@@ -175,16 +173,40 @@ prepare_seed_disk() {
 ## Create the new VM
 # :TODO: this should be optional
 #
-#create_vm() {}
+create_vm() {
+  if [[ ! -z $VERBOSE ]]; then
+    echo "Creating new ${NEW_VM["OS"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
+  else
+    echo "Creating new VM ${NEW_VM["NAME"]}"
+  fi
+
+  echo "virsh console ${NEW_VM["NAME"]} to see when it is finished being created."
+  echo
+
+  virt-install \
+    --cpu host-passthrough \
+    --name ${NEW_VM["NAME"]} \
+    --vcpus ${NEW_VM["CPU"]} \
+    --memory ${NEW_VM["RAM"]} \
+    --disk vol=default/${NEW_VM["NAME"]}.seed.iso,device=cdrom \
+    --disk vol=default/${NEW_VM["NAME"]},device=disk \
+    --os-type linux --os-variant ${NEW_VM["OS_VARIANT"]} \
+    --virt-type kvm \
+    --graphics none \
+    --network network=br0,model=virtio \
+    --noautoconsole \
+    --autostart \
+    --quiet \
+    --import
+}
 
 main() {
   check_mandatory
   check_existing_vm
-  echo "Creating new ${NEW_VM["OS"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
   generate_config
   prepare_os_disk
   prepare_seed_disk
-  #create_vm
+  create_vm
 }
 
 main "$@"
