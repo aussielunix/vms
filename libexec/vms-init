@@ -1,4 +1,11 @@
 #!/usr/bin/env bash
+#
+# Mick Pollard @aussielunix 6-SEP-2021
+#
+# Usage: vms init
+# Summary: initialse the vms command suite ready for use.
+# Help: This is non destructive - it just prints out installation instructions
+#
 set -e
 
 print=""
