@@ -3,9 +3,9 @@
 # Mick Pollard @aussielunix 6-SEP-2021
 #
 # Usage: vms new [-o ubuntu|centos7|centos8] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
-# Summary: This will scaffold out a new VM configuration ready to be switched on.
-# Help: This will generate the files needed for a new VM with static IP based on upstream cloud images.
-# This script generates an opionated cloud-init that can be customised if required.
+# Summary: This will create a new VM configuration, set it to autostart and boot it up.
+# Help: This will create a new VM configuration, set it to autostart and boot it up.
+# The new VM will have a static IP and be built based on upstream cloud images.
 #
 # #Required arguments
 #
@@ -117,7 +117,6 @@ check_existing_vm() {
 ## Set NEW_VM["OS"] & NEW_VM["OS_VARIANT"]
 #
 set_os_variant() {
-  echo "OS: ${NEW_VM["OS"]}"
   case "${NEW_VM["OS"]}" in
     ubuntu)
       NEW_VM["OS"]="ubuntu"
@@ -190,11 +189,12 @@ prepare_seed_disk() {
   virsh vol-upload --pool $IMGPOOL ${NEW_VM["NAME"]}.seed.iso ${IMGFILE} > /dev/null
   
   # :TODO: this should be fixed as part of trapping the mktmp
-  echo "rm -rf ${NEW_VM["TMPDIR"]}"
+  if [[ ! -z $VERBOSE ]]; then
+    echo "rm -rf ${NEW_VM["TMPDIR"]}"
+  fi
 }
 
 ## Create the new VM
-# :TODO: this should be optional
 #
 create_vm() {
   if [[ ! -z $VERBOSE ]]; then
