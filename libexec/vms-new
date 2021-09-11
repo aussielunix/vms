@@ -2,7 +2,7 @@
 #
 # Mick Pollard @aussielunix 6-SEP-2021
 #
-# Usage: vms new [-o ubuntu|centos] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
+# Usage: vms new [-o ubuntu|centos7|centos8] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
 # Summary: This will scaffold out a new VM configuration ready to be switched on.
 # Help: This will generate the files needed for a new VM with static IP based on upstream cloud images.
 # This script generates an opionated cloud-init that can be customised if required.
@@ -14,14 +14,16 @@
 #
 # #Optional arguments
 #
-#   [-d disksize]     - <interger> hdd size, in GB (default: 50G)
-#   [-r ram]          - <integer> ram size, in MB (default: 2048)
-#   [-c cpu]          - <integer> cpu count       (default: 2)
-#   [-v]              - be VERBOSE      (default: false)
+#   [-c cpu]          - <integer> cpu count                       (default: 2)
+#   [-d disksize]     - <interger> hdd size, in GB                (default: 50G)
+#   [-o os_variant]   - <string> [ubuntu20.04|centos7.0|centos8]  (default: ubuntu20.04)
+#   [-r ram]          - <integer> ram size, in MB                 (default: 2048)
+#   [-v]              - be VERBOSE                                (default: false)
 #
 # #Examples
 #
 #   foo@bar$ vms new -n testvm  -i 73
+#   foo@bar$ vms new -n testvm  -i 73 -o centos8
 #   foo@bar$ vms new -n testvm  -i 73 -v
 #   foo@bar$ vms new -n testvm2 -i 74 -d 100 -r 4096 -c 4
 #
@@ -45,11 +47,9 @@ NEW_VM["IP"]=""
 NEW_VM["DISK"]="50"
 NEW_VM["RAM"]="2048"
 NEW_VM["CPU"]="2"
+NEW_VM["OS"]="ubuntu"
 NEW_VM["TMPDIR"]="/tmp/foo$$" # :FIXME: This should be trapped
 
-# future use
-NEW_VM["OS_VARIANT"]="ubuntu20.04"
-NEW_VM["OS"]="Ubuntu"
 
 while getopts ":n:i:d:r:c:o:v" opt; do
   case $opt in
@@ -114,6 +114,30 @@ check_existing_vm() {
     exit 64
   fi
 }
+## Set NEW_VM["OS"] & NEW_VM["OS_VARIANT"]
+#
+set_os_variant() {
+  echo "OS: ${NEW_VM["OS"]}"
+  case "${NEW_VM["OS"]}" in
+    ubuntu)
+      NEW_VM["OS"]="ubuntu"
+      NEW_VM["OS_VARIANT"]="ubuntu20.04"
+      ;;
+    centos7)
+      NEW_VM["OS_VARIANT"]="centos8"
+      NEW_VM["OS"]="centos"
+      ;;
+    centos | centos8)
+      NEW_VM["OS_VARIANT"]="centos8"
+      NEW_VM["OS"]="centos"
+      ;;
+    *)
+      echo "Unknow OS: ${NEW_VM["OS"]}"
+      vms help new
+      exit 2
+      ;;
+  esac
+}
 
 ## Generate config files for new VM
 #
@@ -129,8 +153,8 @@ generate_config() {
   mkdir -p ${NEW_VM["TMPDIR"]}
   
   echo "instance-id: $(uuidgen || echo i-abcdefg)" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
-  cat ${_VMS_ROOT}/share/templates/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
-  cat ${_VMS_ROOT}/share/templates/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit
+  cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
+  cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit
 
   # generate the iso file of the above config files
   # :TODO: wrap this in a TRAP
@@ -147,9 +171,8 @@ prepare_os_disk() {
   if [[ ! -z $VERBOSE ]]; then
     echo "Creating disk volume ${NEW_VM["NAME"]} from ${NEW_VM["OS_VARIANT"]} cloud image and resizing it to ${NEW_VM["DISK"]}G"
   fi
-  # :FIXME: replace cloud image name with variable NEW_VM["OS_VARIANT"]
-  # :FIXME: This will require renaming the cloudimages in the volume pool
-  virsh vol-clone --pool default --vol focal-server-cloudimg-amd64 --newname ${NEW_VM["NAME"]} > /dev/null
+
+  virsh vol-clone --pool default --vol ${NEW_VM["OS_VARIANT"]} --newname ${NEW_VM["NAME"]} > /dev/null
   virsh vol-resize --pool default --vol "${NEW_VM["NAME"]}" "${NEW_VM["DISK"]}G" > /dev/null
 }
 
@@ -175,9 +198,9 @@ prepare_seed_disk() {
 #
 create_vm() {
   if [[ ! -z $VERBOSE ]]; then
-    echo "Creating new ${NEW_VM["OS"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
+    echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
   else
-    echo "Creating new VM ${NEW_VM["NAME"]}"
+    echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - ${NEW_VM["NAME"]}"
   fi
 
   echo "virsh console ${NEW_VM["NAME"]} to see when it is finished being created."
@@ -203,6 +226,7 @@ create_vm() {
 main() {
   check_mandatory
   check_existing_vm
+  set_os_variant
   generate_config
   prepare_os_disk
   prepare_seed_disk
