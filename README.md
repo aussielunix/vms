@@ -33,7 +33,7 @@ This is only tested with the following combination:
 * a single NIC bridged to the local LAN
 * directory based storage volume pools
 
-**Note:** I built my homelab with [aussielunix/vmlab](https://github.com/aussielunix/vmlab)
+**Note:** I built my homelab with [aussielunix/vmlab](https://github.com/aussielunix/vmlab) (coming soon)
 
 ## Installation
 
