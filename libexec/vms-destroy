@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+#
+# Mick Pollard @aussielunix 11-SEP-2021
+#
+# Usage: vms destroy [-n name] [-Y]
+# Summary: This will completely DESTROY the VM and any disks attached.
+# Help: This will destroy the VM, both disks and any data on them.
+#
+# #Required arguments
+#
+#   [-n name]         - name of the VM. must be unique.   (default: null)
+#
+# #Optional arguments
+#
+#   [-Y]              - destroy without confirmation      (default: false)
+#   [-h]              - print this help                   (default: false)
+#
+# #Examples
+#
+#   foo@bar$ vms destroy -n testvm
+#   All data on VM: pajuna will be destroyed.
+#   Are you sure: [Y/N]
+#   foo@bar$ vms destroy -Y
+#
+#
+set -e
+
+unset CONFIRM
+VMNAME="null"
+
+if [[ $# == 0 ]]; then
+  echo "error: missing arguments."
+  echo
+  echo
+  vms help destroy
+  exit 1
+fi
+
+while getopts "n:Yh" opt; do
+  case $opt in
+    n)
+      VMNAME=$OPTARG
+      ;;
+    Y)
+      CONFIRM="1"
+      ;;
+    h)
+      vms help destroy
+      exit 0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      echo
+      echo
+      vms help destroy
+      exit 1
+      ;;
+    :)
+      echo "Option: -$OPTARG requires an argument." >&2
+      echo
+      echo
+      vms help destroy
+      exit 1
+    ;;
+  esac
+done
+
+## Check that mandatory flags/arguments are present
+#
+check_mandatory() {
+  if [[ -z "${VMNAME}" ]]; then
+    echo "Missing mandatory argument: [-n name]"
+    echo
+    echo
+    vms help destroy
+    exit 1
+  fi
+}
+
+## Check if VM exists
+# :TODO: - pass the xml and exact match the name
+check_existing_vm() {
+  if [[ ! $(virsh list --all | grep ${VMNAME}) ]]; then
+    echo "abort: ${VMNAME} does not exist."
+    exit 64
+  fi
+}
+
+## Confirmation it is ok to destroy
+#
+confirmation() {
+  if [[ -z "${CONFIRM}" ]]; then
+    read -r -p "Are you sure? [Y/n] " input
+    if [[ $input != "Y" ]]; then
+      echo "Aborted."      
+      exit 1
+    fi
+  fi
+}
+
+## Destructively destroy VM and everything attached to it
+#
+delete_vm() {
+  virsh destroy ${VMNAME}
+  virsh undefine --nvram --remove-all-storage --delete-snapshots ${VMNAME}
+}
+
+
+main() {
+  check_mandatory
+  check_existing_vm
+  confirmation
+  delete_vm
+}
+
+main "$@"
