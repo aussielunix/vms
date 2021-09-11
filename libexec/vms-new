@@ -45,11 +45,11 @@ NEW_VM["IP"]=""
 NEW_VM["DISK"]="50"
 NEW_VM["RAM"]="2048"
 NEW_VM["CPU"]="2"
+NEW_VM["TMPDIR"]="/tmp/foo$$" # :FIXME: This should be trapped
+
+# future use
 NEW_VM["OS_VARIANT"]="ubuntu20.04"
-NEW_VM["BASEDIR"]="${HOME}/.vms"
-NEW_VM["CONFDIR"]="${NEW_VM["BASEDIR"]}/conf.d/test-01"
-NEW_VM["BASEIMAGESDIR"]="${NEW_VM["BASEDIR"]}/cloudimages"
-NEW_VM["BASEIMAGE"]="${NEW_VM["BASEDIR"]}/cloudimages/focal-server-cloudimg-amd64.img"
+NEW_VM["OS"]="Ubuntu"
 
 while getopts ":n:i:d:r:cov" opt; do
   case $opt in
@@ -104,15 +104,12 @@ check_mandatory() {
     vms help new
     exit 1
   fi
-
-  # redeclare with corrected VM_NAME
-  NEW_VM["CONFDIR"]="${NEW_VM["BASEDIR"]}/conf.d/${NEW_VM["NAME"]}"
 }
 
-## Check if a config already exists for desired vm
-#
+## Check if VM already exists
+# :TODO: - pass the xml and exact match the name
 check_existing_vm() {
-  if [[ -d ${NEW_VM["CONFDIR"]} ]]; then
+  if [[ $(virsh list --all | grep ${NEW_VM["NAME"]}) ]]; then
     echo "abort: ${NEW_VM["CONFDIR"]} already exists."
     exit 64
   fi
@@ -122,38 +119,57 @@ check_existing_vm() {
 #
 generate_config() {
   if [[ ! -z $VERBOSE ]]; then
-    echo "mkdir -p ${NEW_VM["CONFDIR"]}"
+    echo "mkdir -p ${NEW_VM["TMPDIR"]}"
     echo
-    echo "Generated VM details file             ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cfg"
-    echo "Generated metadata file               ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.metadata"
-    echo "Generated network configuration       ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.netplan"
-    echo "Generated cloud-configuration         ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cloudinit"
+    echo "Generated metadata file               ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata"
+    echo "Generated network configuration       ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan"
+    echo "Generated cloud-configuration         ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit"
     echo
   fi
-  mkdir -p ${NEW_VM["CONFDIR"]}
+  mkdir -p ${NEW_VM["TMPDIR"]}
   
-  echo "---" >> ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cfg
-  for KEY in "${!NEW_VM[@]}"; do
-    echo "${KEY}: ${NEW_VM[$KEY]}" >> ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cfg
-  done
+  echo "instance-id: $(uuidgen || echo i-abcdefg)" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
+  cat ${_VMS_ROOT}/share/templates/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
+  cat ${_VMS_ROOT}/share/templates/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit
 
-  echo "instance-id: $(uuidgen || echo i-abcdefg)" > ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.metadata
-  cat ${_VMS_ROOT}/share/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.netplan
-  cat ${_VMS_ROOT}/share/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cloudinit
+  # generate the iso file of the above config files
+  # :TODO: wrap this in a TRAP
+  cloud-localds \
+    --network-config=${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan \
+    ${NEW_VM["TMPDIR"]}/seed.iso \
+    ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit \
+    ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
 }
 
-## Prepare hdd and userdata.iso
+## Prepare os disk based on existing cloud image
 #
-prepare_disks() {
-  # :TODO: generate the iso file of the above config files
-  cloud-localds -v \
-    --network-config=${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.netplan \
-    ${NEW_VM["CONFDIR"]}/seed.iso \
-    ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cloudinit \
-    ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.metadata
+prepare_os_disk() {
+  if [[ ! -z $VERBOSE ]]; then
+    echo "Creating disk volume ${NEW_VM["NAME"]} from ${NEW_VM["OS_VARIANT"]} cloud image and resizing it to ${NEW_VM["DISK"]}G"
+    echo
+  fi
+  # :FIXME: replace cloud image name with variable NEW_VM["OS_VARIANT"]
+  # :FIXME: This will require renaming the cloudimages in the volume pool
+  virsh vol-clone --pool default --vol focal-server-cloudimg-amd64 --newname ${NEW_VM["NAME"]} > /dev/null
+  virsh vol-resize --pool default --vol "${NEW_VM["NAME"]}" "${NEW_VM["DISK"]}G" > /dev/null
+}
 
-  virsh vol-clone --pool default --vol ubuntu20.04.template --newname ${NEW_VM["NAME"]}
-  virsh vol-resize --pool default --vol "${NEW_VM["NAME"]}" "${NEW_VM["DISK"]}G"
+## Cloud images need a seed.iso with meta-data, user-data and network config
+#
+prepare_seed_disk() {
+  if [[ ! -z $VERBOSE ]]; then
+    echo "Creating a virtual cdrom with ${NEW_VM["NAME"]}.metadata, ${NEW_VM["NAME"]}.netplan & ${NEW_VM["NAME"]}.cloudinit"
+    echo
+  fi
+  IMGFILE="${NEW_VM["TMPDIR"]}/seed.iso"
+  IMGSIZE=$(qemu-img info --output json ${IMGFILE} | jq -r .[\"virtual-size\"])
+  IMGFMT=$(qemu-img info --output json ${IMGFILE} | jq -r .format)
+  IMGPOOL=default
+  virsh vol-create-as $IMGPOOL ${NEW_VM["NAME"]}.seed.iso $IMGSIZE --format $IMGFMT > /dev/null
+  virsh vol-upload --pool $IMGPOOL ${NEW_VM["NAME"]}.seed.iso ${IMGFILE} > /dev/null
+  
+  # :TODO: this should be fixed as part of trapping the mktmp
+  echo "rm -rf ${NEW_VM["TMPDIR"]}"
 }
 
 ## Create the new VM
@@ -166,7 +182,8 @@ main() {
   check_existing_vm
   echo "Creating new ${NEW_VM["OS"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
   generate_config
-  prepare_disks
+  prepare_os_disk
+  prepare_seed_disk
   #create_vm
 }
 
