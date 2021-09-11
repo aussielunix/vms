@@ -9,14 +9,14 @@
 #
 # #Required arguments
 #
-#   [-n name]         - name of the VM. must be unique.
-#   [-i ip]           - the last octet of the IP address for the VM
+#   [-n name]         - <string> name of the VM. must be unique.
+#   [-i ip]           - <integer> the last octet of the IP address for the VM
 #
 # #Optional arguments
 #
-#   [-d disksize]     - hdd size, in MB (default: 50GB)
-#   [-r ram]          - ram size, in MB (default: 2048)
-#   [-c cpu]          - cpu count       (default: 2)
+#   [-d disksize]     - <interger> hdd size, in GB (default: 50G)
+#   [-r ram]          - <integer> ram size, in MB (default: 2048)
+#   [-c cpu]          - <integer> cpu count       (default: 2)
 #   [-v]              - be VERBOSE      (default: false)
 #
 # #Examples
@@ -51,7 +51,7 @@ NEW_VM["TMPDIR"]="/tmp/foo$$" # :FIXME: This should be trapped
 NEW_VM["OS_VARIANT"]="ubuntu20.04"
 NEW_VM["OS"]="Ubuntu"
 
-while getopts ":n:i:d:r:cov" opt; do
+while getopts ":n:i:d:r:c:o:v" opt; do
   case $opt in
     n)
       NEW_VM["NAME"]=$OPTARG
