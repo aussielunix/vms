@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+#
+# Mick Pollard @aussielunix 6-SEP-2021
+#
+# Usage: vms new [-o ubuntu|centos] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
+# Summary: This will scaffold out a new VM configuration ready to be switched on.
+# Help: This will generate the files needed for a new VM with static IP based on upstream cloud images.
+# This script generates an opionated cloud-init that can be customised if required.
+#
+# #Required arguments
+#
+#   [-n name]         - name of the VM. must be unique.
+#   [-i ip]           - the last octet of the IP address for the VM
+#
+# #Optional arguments
+#
+#   [-d disksize]     - hdd size, in MB (default: 50GB)
+#   [-r ram]          - ram size, in MB (default: 2048)
+#   [-c cpu]          - cpu count       (default: 2)
+#   [-v]              - be VERBOSE      (default: false)
+#
+# #Examples
+#
+#   foo@bar$ vms new -n testvm  -i 73
+#   foo@bar$ vms new -n testvm  -i 73 -v
+#   foo@bar$ vms new -n testvm2 -i 74 -d 100 -r 4096 -c 4
+#
+#
+set -e
+
+if [[ $# == 0 ]]; then
+  echo "error: missing arguments."
+  echo
+  echo
+  vms help new
+  exit 1
+fi
+
+## Set some defaults for our new VM
+# requires bash 4 or higher
+#
+declare -A NEW_VM
+NEW_VM["NAME"]=""
+NEW_VM["IP"]=""
+NEW_VM["DISK"]="50"
+NEW_VM["RAM"]="2048"
+NEW_VM["CPU"]="2"
+NEW_VM["OS_VARIANT"]="ubuntu20.04"
+NEW_VM["BASEDIR"]="${HOME}/.vms"
+NEW_VM["CONFDIR"]="${NEW_VM["BASEDIR"]}/conf.d/test-01"
+NEW_VM["BASEIMAGESDIR"]="${NEW_VM["BASEDIR"]}/cloudimages"
+NEW_VM["BASEIMAGE"]="${NEW_VM["BASEDIR"]}/cloudimages/focal-server-cloudimg-amd64.img"
+
+while getopts ":n:i:d:r:cov" opt; do
+  case $opt in
+    n)
+      NEW_VM["NAME"]=$OPTARG
+      ;;
+    i)
+      NEW_VM["IP"]=$OPTARG
+      ;;
+    d)
+      NEW_VM["DISK"]=$OPTARG
+      ;;
+    r)
+      NEW_VM["RAM"]=$OPTARG
+      ;;
+    c)
+      NEW_VM["CPU"]=$OPTARG
+      ;;
+    o)
+      NEW_VM["OS"]=$OPTARG
+      ;;
+    v)
+      VERBOSE="1"
+      ;;
+    h)
+      vms help new
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      echo
+      echo
+      vms help new
+      exit 1
+      ;;
+    :)
+      echo "Option: -$OPTARG requires an argument." >&2
+      echo
+      echo
+      vms help new
+      exit 1
+    ;;
+  esac
+done
+
+## Check that mandatory flags/arguments are present
+#
+check_mandatory() {
+  if [[ -z "${NEW_VM["NAME"]:-}" ]] || [[ -z "${NEW_VM["IP"]}" ]]; then
+    echo "Missing mandatory argument: [-n name] or [-i ip]"
+    echo
+    echo
+    vms help new
+    exit 1
+  fi
+
+  # redeclare with corrected VM_NAME
+  NEW_VM["CONFDIR"]="${NEW_VM["BASEDIR"]}/conf.d/${NEW_VM["NAME"]}"
+}
+
+## Check if a config already exists for desired vm
+#
+check_existing_vm() {
+  if [[ -d ${NEW_VM["CONFDIR"]} ]]; then
+    echo "abort: ${NEW_VM["CONFDIR"]} already exists."
+    exit 64
+  fi
+}
+
+## Generate config files for new VM
+#
+generate_config() {
+  if [[ ! -z $VERBOSE ]]; then
+    echo "mkdir -p ${NEW_VM["CONFDIR"]}"
+    echo
+    echo "Generated VM details file             ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cfg"
+    echo "Generated metadata file               ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.metadata"
+    echo "Generated network configuration       ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.netplan"
+    echo "Generated cloud-configuration         ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cloudinit"
+    echo
+  fi
+  mkdir -p ${NEW_VM["CONFDIR"]}
+  
+  echo "---" >> ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cfg
+  for KEY in "${!NEW_VM[@]}"; do
+    echo "${KEY}: ${NEW_VM[$KEY]}" >> ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cfg
+  done
+
+  echo "instance-id: $(uuidgen || echo i-abcdefg)" > ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.metadata
+  cat ${_VMS_ROOT}/share/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.netplan
+  cat ${_VMS_ROOT}/share/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cloudinit
+}
+
+## Prepare hdd and userdata.iso
+#
+prepare_disks() {
+  # :TODO: generate the iso file of the above config files
+  cloud-localds -v \
+    --network-config=${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.netplan \
+    ${NEW_VM["CONFDIR"]}/seed.iso \
+    ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.cloudinit \
+    ${NEW_VM["CONFDIR"]}/${NEW_VM["NAME"]}.metadata
+
+  virsh vol-clone --pool default --vol ubuntu20.04.template --newname ${NEW_VM["NAME"]}
+  virsh vol-resize --pool default --vol "${NEW_VM["NAME"]}" "${NEW_VM["DISK"]}G"
+}
+
+## Create the new VM
+# :TODO: this should be optional
+#
+#create_vm() {}
+
+main() {
+  check_mandatory
+  check_existing_vm
+  echo "Creating new ${NEW_VM["OS"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
+  generate_config
+  prepare_disks
+  #create_vm
+}
+
+main "$@"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
