@@ -123,7 +123,7 @@ set_os_variant() {
       NEW_VM["OS_VARIANT"]="ubuntu20.04"
       ;;
     centos7)
-      NEW_VM["OS_VARIANT"]="centos8"
+      NEW_VM["OS_VARIANT"]="centos7.0"
       NEW_VM["OS"]="centos"
       ;;
     centos | centos8)
