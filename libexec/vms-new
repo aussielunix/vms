@@ -199,6 +199,25 @@ prepare_seed_disk() {
 create_vm() {
   if [[ ! -z $VERBOSE ]]; then
     echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
+
+    cat <<-EOF
+    virt-install \
+      --cpu host-passthrough \
+      --name ${NEW_VM["NAME"]} \
+      --vcpus ${NEW_VM["CPU"]} \
+      --memory ${NEW_VM["RAM"]} \
+      --disk vol=default/${NEW_VM["NAME"]}.seed.iso,device=cdrom \
+      --disk vol=default/${NEW_VM["NAME"]},device=disk \
+      --os-type linux --os-variant ${NEW_VM["OS_VARIANT"]} \
+      --virt-type kvm \
+      --graphics none \
+      --network network=br0,model=virtio \
+      --noautoconsole \
+      --autostart \
+      --quiet \
+      --import
+EOF
+
   else
     echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - ${NEW_VM["NAME"]}"
   fi
