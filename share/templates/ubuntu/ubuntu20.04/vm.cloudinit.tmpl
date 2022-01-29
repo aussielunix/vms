@@ -40,7 +40,8 @@ bootcmd:
 # run once for setup
 runcmd:
     - [ sh, -c, 'update-grub' ]
-    - [ sh, -c, 'touch /home/ubuntu/.ready']
+    - [ sh, -c, 'touch /home/ubuntu/.ready' ]
+    - [ sh, -c, 'systemctl enable --now qemu-guest-agent' ]
 
 # reboot so grub config takes affect
 power_state:
