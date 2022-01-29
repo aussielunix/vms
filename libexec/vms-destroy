@@ -102,7 +102,7 @@ confirmation() {
 #
 delete_vm() {
   virsh destroy ${VMNAME}
-  virsh undefine --nvram --remove-all-storage --delete-snapshots ${VMNAME}
+  virsh undefine --nvram --remove-all-storage ${VMNAME}
 }
 
 

@@ -150,7 +150,7 @@ generate_config() {
     echo
   fi
   mkdir -p ${NEW_VM["TMPDIR"]}
-  
+
   echo "instance-id: $(uuidgen || echo i-abcdefg)" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
   cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
   cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit
@@ -187,7 +187,7 @@ prepare_seed_disk() {
   IMGPOOL=default
   virsh vol-create-as $IMGPOOL ${NEW_VM["NAME"]}.seed.iso $IMGSIZE --format $IMGFMT > /dev/null
   virsh vol-upload --pool $IMGPOOL ${NEW_VM["NAME"]}.seed.iso ${IMGFILE} > /dev/null
-  
+
   # :TODO: this should be fixed as part of trapping the mktmp
   if [[ ! -z $VERBOSE ]]; then
     echo "rm -rf ${NEW_VM["TMPDIR"]}"
@@ -198,7 +198,7 @@ prepare_seed_disk() {
 #
 create_vm() {
   if [[ ! -z $VERBOSE ]]; then
-    echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 192.168.20.${NEW_VM["IP"]}"
+    echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 10.0.99.${NEW_VM["IP"]}"
 
     cat <<-EOF
     virt-install \
