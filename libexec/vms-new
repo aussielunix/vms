@@ -4,28 +4,35 @@
 #
 # Usage: vms new [-o ubuntu|centos7|centos8] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
 # Summary: This will create a new VM configuration, set it to autostart and boot it up.
-# Help: This will create a new VM configuration, set it to autostart and boot it up.
-# The new VM will have a static IP and be built based on upstream cloud images.
+# Help: The VM will be built based on upstream cloud images, and by default, will lease an IP on NAT network.
+#
+# Other Networking options:
+# - VM on NAT interface with static IP
+# - VM on bridge interface using DHCP
+# - VM on bridge interface with static IP
 #
 # #Required arguments
 #
 #   [-n name]         - <string> name of the VM. must be unique.
-#   [-i ip]           - <integer> the last octet of the IP address for the VM
 #
 # #Optional arguments
 #
-#   [-c cpu]          - <integer> cpu count                       (default: 2)
-#   [-d disksize]     - <interger> hdd size, in GB                (default: 50G)
-#   [-o os_variant]   - <string> [ubuntu20.04|centos7.0|centos8]  (default: ubuntu20.04)
-#   [-r ram]          - <integer> ram size, in MB                 (default: 2048)
-#   [-v]              - be VERBOSE                                (default: false)
+#   [-i ip]           - <integer> the last octet of the IP address for the VM (default: nil)
+#   [-e dev]          - <string> alternative host net device [br0|br1|...] (default: virbr0)
+#   [-c cpu]          - <integer> cpu count                                   (default: 2)
+#   [-d disksize]     - <interger> hdd size, in GB                            (default: 50G)
+#   [-o os_variant]   - <string> [ubuntu20.04|centos7.0|centos8]              (default: ubuntu20.04)
+#   [-r ram]          - <integer> ram size, in MB                             (default: 2048)
+#   [-v]              - be VERBOSE                                            (default: false)
 #
 # #Examples
 #
-#   foo@bar$ vms new -n testvm  -i 73
-#   foo@bar$ vms new -n testvm  -i 73 -o centos8
-#   foo@bar$ vms new -n testvm  -i 73 -v
-#   foo@bar$ vms new -n testvm2 -i 74 -d 100 -r 4096 -c 4
+#   foo@bar$ vms new -n testvm2                                 # dhcp on virbr0 (NAT)
+#   foo@bar$ vms new -n testvm  -e br0                          # dhcp on br0 (BRIDGED)
+#   foo@bar$ vms new -n testvm  -e br0 -i 73                    # static IP on br0 (BRIDGED)
+#   foo@bar$ vms new -n testvm  -e br0 -i 73 -o centos8
+#   foo@bar$ vms new -n testvm  -e br0 -i 73 -v
+#   foo@bar$ vms new -n testvm2 -e br0 -i 74 -d 100 -r 4096 -c 4
 #
 #
 set -e
@@ -44,20 +51,23 @@ fi
 declare -A NEW_VM
 NEW_VM["NAME"]=""
 NEW_VM["IP"]=""
+NEW_VM["NDEV"]="default"
 NEW_VM["DISK"]="50"
 NEW_VM["RAM"]="2048"
 NEW_VM["CPU"]="2"
 NEW_VM["OS"]="ubuntu"
 NEW_VM["TMPDIR"]="/tmp/foo$$" # :FIXME: This should be trapped
 
-
-while getopts ":n:i:d:r:c:o:v" opt; do
+while getopts ":n:i:e:d:r:c:o:v" opt; do
   case $opt in
     n)
       NEW_VM["NAME"]=$OPTARG
       ;;
     i)
       NEW_VM["IP"]=$OPTARG
+      ;;
+    e)
+      NEW_VM["NDEV"]=$OPTARG
       ;;
     d)
       NEW_VM["DISK"]=$OPTARG
@@ -97,12 +107,20 @@ done
 ## Check that mandatory flags/arguments are present
 #
 check_mandatory() {
-  if [[ -z "${NEW_VM["NAME"]:-}" ]] || [[ -z "${NEW_VM["IP"]}" ]]; then
-    echo "Missing mandatory argument: [-n name] or [-i ip]"
+  if [[ -z "${NEW_VM["NAME"]:-}" ]]; then
+    echo "Missing mandatory argument: [-n name]"
     echo
     echo
     vms help new
     exit 1
+  fi
+}
+
+## Check not tryng to set static IP on the NAT interface
+#
+set_static_default_device() {
+  if [[ ! -z ${NEW_VM["IP"]} ]] && [[ ${NEW_VM["NDEV"]} == 'default' ]]; then
+    NEW_VM["NDEV"]="br0"
   fi
 }
 
@@ -114,6 +132,7 @@ check_existing_vm() {
     exit 64
   fi
 }
+
 ## Set NEW_VM["OS"] & NEW_VM["OS_VARIANT"]
 #
 set_os_variant() {
@@ -123,12 +142,12 @@ set_os_variant() {
       NEW_VM["OS_VARIANT"]="ubuntu20.04"
       ;;
     centos7)
-      NEW_VM["OS_VARIANT"]="centos7.0"
       NEW_VM["OS"]="centos"
+      NEW_VM["OS_VARIANT"]="centos7.0"
       ;;
     centos | centos8)
-      NEW_VM["OS_VARIANT"]="centos8"
       NEW_VM["OS"]="centos"
+      NEW_VM["OS_VARIANT"]="centos8"
       ;;
     *)
       echo "Unknow OS: ${NEW_VM["OS"]}"
@@ -145,23 +164,34 @@ generate_config() {
     echo "mkdir -p ${NEW_VM["TMPDIR"]}"
     echo
     echo "Generated metadata file               ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata"
-    echo "Generated network configuration       ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan"
     echo "Generated cloud-configuration         ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit"
+    if [[ ! -z ${NEW_VM["IP"]} ]]; then
+      echo "Generated network configuration       ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan"
+    fi
     echo
   fi
   mkdir -p ${NEW_VM["TMPDIR"]}
 
   echo "instance-id: $(uuidgen || echo i-abcdefg)" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
-  cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
   cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit
 
-  # generate the iso file of the above config files
-  # :TODO: wrap this in a TRAP
-  cloud-localds \
-    --network-config=${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan \
-    ${NEW_VM["TMPDIR"]}/seed.iso \
-    ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit \
-    ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
+  if [[ -z ${NEW_VM["IP"]} ]]; then
+    # generate the iso file of the above config files
+    # :TODO: wrap this in a TRAP
+    cloud-localds \
+      ${NEW_VM["TMPDIR"]}/seed.iso \
+      ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit \
+      ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
+  else
+    cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
+    # generate the iso file of the above config files
+    # :TODO: wrap this in a TRAP
+    cloud-localds \
+      --network-config=${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan \
+      ${NEW_VM["TMPDIR"]}/seed.iso \
+      ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit \
+      ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
+    fi
 }
 
 ## Prepare os disk based on existing cloud image
@@ -197,24 +227,33 @@ prepare_seed_disk() {
 ## Create the new VM
 #
 create_vm() {
+
   if [[ ! -z $VERBOSE ]]; then
-    echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 10.0.99.${NEW_VM["IP"]}"
+
+    if [[ -z $NEW_VM["IP"] ]]; then
+      echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]}"
+    else
+      echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - disk: ${NEW_VM["DISK"]} ram: ${NEW_VM["RAM"]} cpu: ${NEW_VM["CPU"]} ip: 10.0.99.${NEW_VM["IP"]}"
+    fi
+
+    echo
+    echo
 
     cat <<-EOF
-    virt-install \
-      --cpu host-passthrough \
-      --name ${NEW_VM["NAME"]} \
-      --vcpus ${NEW_VM["CPU"]} \
-      --memory ${NEW_VM["RAM"]} \
-      --disk vol=default/${NEW_VM["NAME"]}.seed.iso,device=cdrom \
-      --disk vol=default/${NEW_VM["NAME"]},device=disk \
-      --os-type linux --os-variant ${NEW_VM["OS_VARIANT"]} \
-      --virt-type kvm \
-      --graphics none \
-      --network network=br0,model=virtio \
-      --noautoconsole \
-      --autostart \
-      --quiet \
+    virt-install \\
+      --cpu host-passthrough \\
+      --name ${NEW_VM["NAME"]} \\
+      --vcpus ${NEW_VM["CPU"]} \\
+      --memory ${NEW_VM["RAM"]} \\
+      --disk vol=default/${NEW_VM["NAME"]}.seed.iso,device=cdrom \\
+      --disk vol=default/${NEW_VM["NAME"]},device=disk \\
+      --os-type linux --os-variant ${NEW_VM["OS_VARIANT"]} \\
+      --virt-type kvm \\
+      --graphics none \\
+      --network network=${NEW_VM["NDEV"]},model=virtio \\
+      --noautoconsole \\
+      --autostart \\
+      --quiet \\
       --import
 EOF
 
@@ -235,7 +274,7 @@ EOF
     --os-type linux --os-variant ${NEW_VM["OS_VARIANT"]} \
     --virt-type kvm \
     --graphics none \
-    --network network=br0,model=virtio \
+    --network network=${NEW_VM["NDEV"]},model=virtio \
     --noautoconsole \
     --autostart \
     --quiet \
@@ -244,6 +283,7 @@ EOF
 
 main() {
   check_mandatory
+  set_static_default_device
   check_existing_vm
   set_os_variant
   generate_config
