@@ -24,7 +24,10 @@ I built this for my homelab to be able to simply spin up and down VMs.
 
 * public cloud images in qcow2 format
 * cloud-init (not available for editing before creating a VM)
-* static IP bridged to local lan
+* Network options:
+  * VM on NAT interface using DHCP (default) OR
+  * VM on bridge interface using DHCP
+  * VM on bridge interface with static IP
 * new standalone qcow2 image per VM
 
 This is only tested with the following combination:

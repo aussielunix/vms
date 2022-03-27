@@ -4,10 +4,9 @@
 #
 # Usage: vms new [-o ubuntu|centos7|centos8] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
 # Summary: This will create a new VM configuration, set it to autostart and boot it up.
-# Help: The VM will be built based on upstream cloud images, and by default, will lease an IP on NAT network.
+# Help: The VM will be built based on upstream cloud images, and by default, will lease an IP on the NAT network.
 #
-# Other Networking options:
-# - VM on NAT interface with static IP
+# Other Networking options:pi
 # - VM on bridge interface using DHCP
 # - VM on bridge interface with static IP
 #
