@@ -2,7 +2,7 @@
 #
 # Mick Pollard @aussielunix 6-SEP-2021
 #
-# Usage: vms sync [-o ubuntu|debian]
+# Usage: vms sync [-o ubuntu|debian10|debian11]
 # Summary: This update your VM template with the latest cloud image
 # Help: update local VM template with latest (daily) cloud image
 # This will download the latest daily cloud image and add it as a volume to the default libvirt storage pool.
@@ -18,8 +18,9 @@
 #
 # #Examples
 #
-#   foo@bar$ vms sync ubuntu                                 # update local Ubuntu 20.04 template with latest (daily) cloud image
-#   foo@bar$ vms sync debian                                 # update local Debian 10 template with latest (daily) cloud image
+#   foo@bar$ vms sync ubuntu                                  # update local Ubuntu 20.04 template with latest (daily) cloud image
+#   foo@bar$ vms sync debian10                                # update local Debian 10 template with latest (daily) cloud image
+#   foo@bar$ vms sync debian11                                # update local Debian 11 template with latest (daily) cloud image
 #
 #
 set -e
@@ -45,11 +46,19 @@ generate_url() {
       URL="https://cloud-images.ubuntu.com/$_REL/current"
       IMG_NAME="${_REL}-server-cloudimg-amd64.img"
       ;;
-    debian)
+    debian10)
       _REL="buster"
-      _SHORTNAME="debian-10"
+      _SHORTNAME="debian10"
+      _SHORTNAME2="debian-10"
       URL="https://cloud.debian.org/images/cloud/$_REL/latest"
-      IMG_NAME="$_SHORTNAME-genericcloud-amd64.qcow2"
+      IMG_NAME="$_SHORTNAME2-generic-amd64.qcow2"
+      ;;
+    debian11)
+      _REL="bullseye"
+      _SHORTNAME="debian11"
+      _SHORTNAME2="debian-11"
+      URL="https://cloud.debian.org/images/cloud/$_REL/latest"
+      IMG_NAME="$_SHORTNAME2-generic-amd64.qcow2"
       ;;
     *)
       echo "you must select an OS"
@@ -106,5 +115,3 @@ main() {
 }
 
 main "$@"
-
-# vi: ts=4 expandtab

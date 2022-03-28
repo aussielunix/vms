@@ -2,11 +2,11 @@
 #
 # Mick Pollard @aussielunix 6-SEP-2021
 #
-# Usage: vms new [-o ubuntu|centos7|centos8] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
+# Usage: vms new [-o ubuntu|debian10|debian11|centos] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
 # Summary: This will create a new VM configuration, set it to autostart and boot it up.
 # Help: The VM will be built based on upstream cloud images, and by default, will lease an IP on the NAT network.
 #
-# Other Networking options:pi
+# Other Networking options:
 # - VM on bridge interface using DHCP
 # - VM on bridge interface with static IP
 #
@@ -16,22 +16,22 @@
 #
 # #Optional arguments
 #
-#   [-i ip]           - <integer> the last octet of the IP address for the VM (default: nil)
-#   [-e dev]          - <string> alternative host net device [br0|br1|...] (default: virbr0)
-#   [-c cpu]          - <integer> cpu count                                   (default: 2)
-#   [-d disksize]     - <interger> hdd size, in GB                            (default: 50G)
-#   [-o os_variant]   - <string> [ubuntu20.04|centos7.0|centos8]              (default: ubuntu20.04)
-#   [-r ram]          - <integer> ram size, in MB                             (default: 2048)
-#   [-v]              - be VERBOSE                                            (default: false)
+#   [-i ip]           - <integer> the last octet of the IP address for the VM   (default: nil)
+#   [-e dev]          - <string> alternative host net device [br0|br1|...]      (default: virbr0)
+#   [-c cpu]          - <integer> cpu count                                     (default: 2)
+#   [-d disksize]     - <interger> hdd size, in GB                              (default: 50G)
+#   [-o os_variant]   - <string> [ubuntu|debian10|debian11|centos]              (default: ubuntu)
+#   [-r ram]          - <integer> ram size, in MB                               (default: 2048)
+#   [-v]              - be VERBOSE                                              (default: false)
 #
 # #Examples
 #
-#   foo@bar$ vms new -n testvm2                                 # dhcp on virbr0 (NAT)
-#   foo@bar$ vms new -n testvm  -e br0                          # dhcp on br0 (BRIDGED)
-#   foo@bar$ vms new -n testvm  -e br0 -i 73                    # static IP on br0 (BRIDGED)
-#   foo@bar$ vms new -n testvm  -e br0 -i 73 -o centos8
-#   foo@bar$ vms new -n testvm  -e br0 -i 73 -v
-#   foo@bar$ vms new -n testvm2 -e br0 -i 74 -d 100 -r 4096 -c 4
+#   foo@bar$ vms new -n testvm                                                  # dhcp on virbr0 (NAT)
+#   foo@bar$ vms new -n testvm -v                                               # be verbose, dhcp on virbr0 (NAT)
+#   foo@bar$ vms new -n testvm -o debian10                                      # debian10, dhcp on virbr0 (NAT)
+#   foo@bar$ vms new -n testvm -d 100 -r 4096 -c 4                              # 100G disk, 4G ram, 4 CPU, dhcp on virbr0 (NAT)
+#   foo@bar$ vms new -n testvm -e br0                                           # dhcp on br0 (BRIDGED)
+#   foo@bar$ vms new -n testvm -e br0 -i 73                                     # static IP on br0 (BRIDGED)
 #
 #
 set -e
@@ -124,7 +124,7 @@ set_static_default_device() {
 }
 
 ## Check if VM already exists
-# :TODO: - pass the xml and exact match the name
+# :TODO: - parse the xml and exact match the name
 check_existing_vm() {
   if [[ $(virsh list --all | grep ${NEW_VM["NAME"]}) ]]; then
     echo "abort: ${NEW_VM["CONFDIR"]} already exists."
@@ -140,11 +140,15 @@ set_os_variant() {
       NEW_VM["OS"]="ubuntu"
       NEW_VM["OS_VARIANT"]="ubuntu20.04"
       ;;
-    centos7)
-      NEW_VM["OS"]="centos"
-      NEW_VM["OS_VARIANT"]="centos7.0"
+    debian10)
+      NEW_VM["OS"]="debian"
+      NEW_VM["OS_VARIANT"]="debian10"
       ;;
-    centos | centos8)
+    debian11)
+      NEW_VM["OS"]="debian"
+      NEW_VM["OS_VARIANT"]="debian11"
+      ;;
+    centos)
       NEW_VM["OS"]="centos"
       NEW_VM["OS_VARIANT"]="centos8"
       ;;
