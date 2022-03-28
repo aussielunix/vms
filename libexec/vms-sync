@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# Mick Pollard @aussielunix 6-SEP-2021
+#
+# Usage: vms sync [-o ubuntu|debian]
+# Summary: This update your VM template with the latest cloud image
+# Help: update local VM template with latest (daily) cloud image
+# This will download the latest daily cloud image and add it as a volume to the default libvirt storage pool.
+# This can then be used as a template volume to be cloned for creating new VMs, making use of cloud-init.
+#
+# #Required arguments
+#
+#   [ubuntu|debian]     - OS of the latest (daily) cloud image to sync
+#
+# #Optional arguments
+#
+#   [-v]                - be VERBOSE                                            (default: false)
+#
+# #Examples
+#
+#   foo@bar$ vms sync ubuntu                                 # update local Ubuntu 20.04 template with latest (daily) cloud image
+#   foo@bar$ vms sync debian                                 # update local Debian 10 template with latest (daily) cloud image
+#
+#
+set -e
+
+if [[ $# == 0 ]]; then
+  echo "error: missing arguments."
+  echo
+  echo
+  vms help sync
+  exit 1
+fi
+
+if [[ $1 == '-v' ]]; then
+  _VERBOSE=1
+  shift
+fi
+
+generate_url() {
+  case $1 in
+    ubuntu)
+      _REL="focal"
+      _SHORTNAME="ubuntu20.04"
+      URL="https://cloud-images.ubuntu.com/$_REL/current"
+      IMG_NAME="${_REL}-server-cloudimg-amd64.img"
+      ;;
+    debian)
+      _REL="buster"
+      _SHORTNAME="debian-10"
+      URL="https://cloud.debian.org/images/cloud/$_REL/latest"
+      IMG_NAME="$_SHORTNAME-genericcloud-amd64.qcow2"
+      ;;
+    *)
+      echo "you must select an OS"
+      vms help sync
+      exit 1
+  esac
+}
+
+download_img() {
+  _TMP_DIR="/tmp/$$"
+  mkdir -p ${_TMP_DIR}
+  if [[ -n ${_VERBOSE} ]]; then
+    echo "Downloading ${URL}/${IMG_NAME} to ${_TMP_DIR}/${IMG_NAME}"
+    echo "mkdir -p ${_TMP_DIR}"
+  fi
+  curl --silent -L -o "${_TMP_DIR}/${IMG_NAME}"  "${URL}/${IMG_NAME}"
+}
+
+create_volume() {
+  IMGSIZE=$(qemu-img info --output json ${_TMP_DIR}/${IMG_NAME} | jq -r .[\"virtual-size\"])
+  IMGFMT=$(qemu-img info --output json ${_TMP_DIR}/${IMG_NAME} | jq -r .format)
+  IMGPOOL=default
+
+  if [[ $(virsh vol-list --pool ${IMGPOOL} | grep ${_SHORTNAME}) ]]; then
+    echo "Updating ${_SHORTNAME}"
+    if [[ -n ${_VERBOSE} ]]; then
+      echo "virsh vol-delete --pool ${IMGPOOL} --vol ${_SHORTNAME} >/dev/null"
+    fi
+    virsh vol-delete --pool ${IMGPOOL} --vol ${_SHORTNAME} >/dev/null
+  else
+    echo "Creating ${_SHORTNAME}"
+  fi
+
+  if [[ -n ${_VERBOSE} ]]; then
+    echo "virsh vol-create-as ${IMGPOOL} ${_SHORTNAME} ${IMGSIZE} --format ${IMGFMT} > /dev/null"
+    echo "virsh vol-upload --pool ${IMGPOOL} ${_SHORTNAME} ${_TMP_DIR}/${IMG_NAME} > /dev/null"
+  fi
+  virsh vol-create-as ${IMGPOOL} ${_SHORTNAME} ${IMGSIZE} --format ${IMGFMT} > /dev/null
+  virsh vol-upload --pool ${IMGPOOL} ${_SHORTNAME} ${_TMP_DIR}/${IMG_NAME} > /dev/null
+}
+
+cleanup() {
+  if [[ -n ${_VERBOSE} ]]; then
+    echo "rm -rf ${_TMP_DIR}"
+  fi
+  rm -rf ${_TMP_DIR}
+}
+
+main() {
+  generate_url $1
+  download_img
+  create_volume
+  cleanup
+}
+
+main "$@"
+
+# vi: ts=4 expandtab
