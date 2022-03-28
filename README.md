@@ -64,12 +64,13 @@ Creating new ubuntu20.04 VM - mynewvm
 Type virsh console mynewvm to see when it is finished being created.
 ```
 
-To get a new CentOS 8 server VM with a static IP of `192.168.20.78` using the sane defaults for all other options:
+To get a new Debian 11 server VM on the NAT bridge, using the sane defaults for all other options:
 
 ```bash
-[user@vm]  (main) -> vms new -n mynewvm -i 78 -o centos8
-Creating new centos8 VM - mynewvm
-Type virsh console mynewvm to see when it is finished being created.
+[user@vm]  (main) -> vms new -n mynewvm -o debian11
+Creating new debian11 VM - mynewvm
+virsh console mynewvm to see when it is finished being created.
+[user@vm]  (main) -> ssh mynewvm
 ```
 
 ## Contributing
