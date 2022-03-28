@@ -56,6 +56,14 @@ bin/vms init
 [user@vm]  (main) -> vms help new
 ```
 
+First, you need to setup templates of the Cloud Images.
+
+```bash
+[user@vm]  (main) -> vms sync ubuntu
+[user@vm]  (main) -> vms sync debian10
+[user@vm]  (main) -> vms sync debian11
+```
+
 To get a new Ubuntu Focal (20.04 LTS) server VM with a static IP of `192.168.20.77` using the sane defaults for all other options:
 
 ```bash
