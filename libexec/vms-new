@@ -126,8 +126,9 @@ set_static_default_device() {
 ## Check if VM already exists
 # :TODO: - parse the xml and exact match the name
 check_existing_vm() {
-  if [[ $(virsh list --all | grep ${NEW_VM["NAME"]}) ]]; then
-    echo "abort: ${NEW_VM["CONFDIR"]} already exists."
+  virsh -rq dominfo --domain ${NEW_VM["NAME"]} >/dev/null 2>&1 || EXIT_CODE=$?
+  if [[ ${EXIT_CODE} -eq 0 ]]; then
+    echo "abort: ${NEW_VM["NAME"]} already exists."
     exit 64
   fi
 }
