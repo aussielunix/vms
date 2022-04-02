@@ -10,17 +10,17 @@
 #
 # #Required arguments
 #
-#   [ubuntu|debian]     - OS of the latest (daily) cloud image to sync
+#   -o [ubuntu|debian10|debian11]      - OS of the latest (daily) cloud image to sync
 #
 # #Optional arguments
 #
-#   [-v]                - be VERBOSE                                            (default: false)
+#   [-v]                    - be VERBOSE                        (default: false)
 #
 # #Examples
 #
-#   foo@bar$ vms sync ubuntu                                  # update local Ubuntu 20.04 template with latest (daily) cloud image
-#   foo@bar$ vms sync debian10                                # update local Debian 10 template with latest (daily) cloud image
-#   foo@bar$ vms sync debian11                                # update local Debian 11 template with latest (daily) cloud image
+#   foo@bar$ vms sync -o ubuntu                                  # update local Ubuntu 20.04 template with latest (daily) cloud image
+#   foo@bar$ vms sync -o debian10                                # update local Debian 10 template with latest (daily) cloud image
+#   foo@bar$ vms sync -o debian11                                # update local Debian 11 template with latest (daily) cloud image
 #
 #
 set -e
@@ -33,13 +33,36 @@ if [[ $# == 0 ]]; then
   exit 1
 fi
 
-if [[ $1 == '-v' ]]; then
-  _VERBOSE=1
-  shift
-fi
+while getopts ":o:v" opt; do
+  case $opt in
+    o)
+      _OS=$OPTARG
+      ;;
+    v)
+      _VERBOSE="1"
+      ;;
+    h)
+      vms help sync
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      echo
+      echo
+      vms help sync
+      exit 1
+      ;;
+    :)
+      echo "Option: -$OPTARG requires an argument." >&2
+      echo
+      echo
+      vms help sync
+      exit 1
+    ;;
+  esac
+done
 
 generate_url() {
-  case $1 in
+  case ${_OS} in
     ubuntu)
       _REL="focal"
       _SHORTNAME="ubuntu20.04"
@@ -116,3 +139,4 @@ main() {
 }
 
 main "$@"
+
