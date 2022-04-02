@@ -3,7 +3,7 @@
 # Mick Pollard @aussielunix 6-SEP-2021
 #
 # Usage: vms sync [-o ubuntu|debian10|debian11]
-# Summary: This update your VM template with the latest cloud image
+# Summary: This updates the local cache with the latest cloud image
 # Help: update local VM template with latest (daily) cloud image
 # This will download the latest daily cloud image and add it as a volume to the default libvirt storage pool.
 # This can then be used as a template volume to be cloned for creating new VMs, making use of cloud-init.

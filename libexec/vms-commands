@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Usage: vms commands
-# Summary: List all vms commands
+# Usage: vms commands (used for bash-completion)
+# Summary: List all vms commands (used for bash-completion)
 # Help: This command is mostly used for autocompletion in various shells, and for `vms help`.
 # Also, this command helps find commands that are named the same as potentially builtin shell commands (which, cd, etc)
 
