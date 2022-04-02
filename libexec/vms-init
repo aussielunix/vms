@@ -4,7 +4,7 @@
 #
 # Usage: vms init
 # Summary: initialse the vms command suite ready for use.
-# Help: This is non destructive - it just prints out installation instructions
+# Help: This will create ~/.vms, add templates to it and then prints out final installation instructions
 #
 set -e
 
@@ -40,6 +40,14 @@ abs_dirname() {
 root="$(abs_dirname "$0")/.."
 
 if [ -z "$print" ]; then
+  if [[ ! -d "$HOME/.vms/templates" ]]; then
+    mkdir -p ~/.vms -m 0700
+    echo "creating $HOME/.vms/templates"
+    echo "You should review and edit the templates before creating any VMs"
+    echo
+    cp -a ${_VMS_ROOT}/share/templates $HOME/.vms/
+  fi
+
   case "$shell" in
   bash )
     profile='~/.bash_profile'

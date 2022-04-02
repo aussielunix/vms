@@ -44,6 +44,14 @@ if [[ $# == 0 ]]; then
   exit 1
 fi
 
+if [[ ! -d "$HOME/.vms/templates" ]]; then
+  echo
+  echo "$HOME/.vms/templates not found."
+  echo "You need to run 'vms init'"
+  echo
+  exit 1
+fi
+
 ## Set some defaults for our new VM
 # requires bash 4 or higher
 #
@@ -168,16 +176,16 @@ generate_config() {
     echo "mkdir -p ${NEW_VM["TMPDIR"]}"
     echo
     echo "Generated metadata file               ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata"
-    echo "Generated cloud-configuration         ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit"
+    echo "Generated ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit from ${HOME}/.vms/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.cloudinit.tmpl"
     if [[ ! -z ${NEW_VM["IP"]} ]]; then
-      echo "Generated network configuration       ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan"
+      echo "Generated ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan from ${HOME}/.vms/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.netplan.tmpl"
     fi
     echo
   fi
   mkdir -p ${NEW_VM["TMPDIR"]}
 
   echo "instance-id: $(uuidgen || echo i-abcdefg)" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
-  cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit
+  cat ${HOME}/.vms/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.cloudinit.tmpl | sed "s/VMNAME/${NEW_VM["NAME"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit
 
   if [[ -z ${NEW_VM["IP"]} ]]; then
     # generate the iso file of the above config files
@@ -187,7 +195,7 @@ generate_config() {
       ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.cloudinit \
       ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.metadata
   else
-    cat ${_VMS_ROOT}/share/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
+    cat ${HOME}/.vms/templates/${NEW_VM["OS"]}/${NEW_VM["OS_VARIANT"]}/vm.netplan.tmpl | sed "s/VMADDRESS/${NEW_VM["IP"]}/g" > ${NEW_VM["TMPDIR"]}/${NEW_VM["NAME"]}.netplan
     # generate the iso file of the above config files
     # :TODO: wrap this in a TRAP
     cloud-localds \
@@ -265,6 +273,7 @@ EOF
     echo "Creating new ${NEW_VM["OS_VARIANT"]} VM - ${NEW_VM["NAME"]}"
   fi
 
+  echo
   echo "virsh console ${NEW_VM["NAME"]} to see when it is finished being created."
   echo
 
