@@ -101,10 +101,11 @@ confirmation() {
 ## Destructively destroy VM and everything attached to it
 #
 delete_vm() {
-  virsh destroy ${VMNAME}
+  if [[ $(virsh domstate --domain ${VMNAME}) == 'running' ]]; then
+    virsh destroy ${VMNAME}
+  fi
   virsh undefine --nvram --remove-all-storage ${VMNAME}
 }
-
 
 main() {
   check_mandatory
