@@ -73,6 +73,7 @@ download_img() {
   if [[ -n ${_VERBOSE} ]]; then
     echo "Downloading ${URL}/${IMG_NAME} to ${_TMP_DIR}/${IMG_NAME}"
     echo "mkdir -p ${_TMP_DIR}"
+    echo "curl --silent -L -o '${_TMP_DIR}/${IMG_NAME}'  '${URL}/${IMG_NAME}'"
   fi
   curl --silent -L -o "${_TMP_DIR}/${IMG_NAME}"  "${URL}/${IMG_NAME}"
 }
