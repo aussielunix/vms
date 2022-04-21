@@ -41,12 +41,14 @@ root="$(abs_dirname "$0")/.."
 
 if [ -z "$print" ]; then
   if [[ ! -d "$HOME/.vms/templates" ]]; then
-    mkdir -p ~/.vms -m 0700
     echo "creating $HOME/.vms/templates"
-    echo "You should review and edit the templates before creating any VMs"
-    echo
-    cp -a ${_VMS_ROOT}/share/templates $HOME/.vms/
+    mkdir -p ~/.vms -m 0700
+  else
+    echo "Updating $HOME/.vms/templates"
   fi
+  echo "You should review and edit the templates before creating any VMs"
+  echo
+  cp -an ${_VMS_ROOT}/share/templates $HOME/.vms/
 
   case "$shell" in
   bash )
