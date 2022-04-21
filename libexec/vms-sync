@@ -2,7 +2,7 @@
 #
 # Mick Pollard @aussielunix 6-SEP-2021
 #
-# Usage: vms sync [-o ubuntu|debian10|debian11]
+# Usage: vms sync [-o ubuntu20|ubuntu22|debian10|debian11]
 # Summary: This updates the local cache with the latest cloud image
 # Help: update local VM template with latest (daily) cloud image
 # This will download the latest daily cloud image and add it as a volume to the default libvirt storage pool.
@@ -10,7 +10,7 @@
 #
 # #Required arguments
 #
-#   -o [ubuntu|debian10|debian11]      - OS of the latest (daily) cloud image to sync
+#   -o [ubuntu20|ubuntu22|debian10|debian11]      - OS of the latest (daily) cloud image to sync
 #
 # #Optional arguments
 #
@@ -18,7 +18,8 @@
 #
 # #Examples
 #
-#   foo@bar$ vms sync -o ubuntu                                  # update local Ubuntu 20.04 template with latest (daily) cloud image
+#   foo@bar$ vms sync -o ubuntu20                                # update local Ubuntu 20.04 template with latest (daily) cloud image
+#   foo@bar$ vms sync -o ubuntu22                                # update local Ubuntu 22.04 template with latest (daily) cloud image
 #   foo@bar$ vms sync -o debian10                                # update local Debian 10 template with latest (daily) cloud image
 #   foo@bar$ vms sync -o debian11                                # update local Debian 11 template with latest (daily) cloud image
 #
@@ -63,7 +64,13 @@ done
 
 generate_url() {
   case ${_OS} in
-    ubuntu)
+    ubuntu22)
+      _REL="jammy"
+      _SHORTNAME="ubuntu22.04"
+      URL="https://cloud-images.ubuntu.com/$_REL/current"
+      IMG_NAME="${_REL}-server-cloudimg-amd64.img"
+      ;;
+    ubuntu20)
       _REL="focal"
       _SHORTNAME="ubuntu20.04"
       URL="https://cloud-images.ubuntu.com/$_REL/current"

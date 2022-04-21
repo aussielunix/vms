@@ -2,7 +2,7 @@
 #
 # Mick Pollard @aussielunix 6-SEP-2021
 #
-# Usage: vms new [-o ubuntu|debian10|debian11|centos] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
+# Usage: vms new [-o ubuntu20|ubuntu22|debian10|debian11|centos] [-n name] [-i ip] [-d disksize] [-r ram] [-c cpu]
 # Summary: This will create a new VM configuration, set it to autostart and boot it up.
 # Help: The VM will be built based on upstream cloud images, and by default, will lease an IP on the NAT network.
 #
@@ -20,7 +20,7 @@
 #   [-e dev]          - <string> alternative host net device [br0|br1|...]      (default: virbr0)
 #   [-c cpu]          - <integer> cpu count                                     (default: 2)
 #   [-d disksize]     - <interger> hdd size, in GB                              (default: 50G)
-#   [-o os_variant]   - <string> [ubuntu|debian10|debian11|centos]              (default: ubuntu)
+#   [-o os_variant]   - <string> [ubuntu20|ubuntu22|debian10|debian11|centos]   (default: ubuntu22)
 #   [-r ram]          - <integer> ram size, in MB                               (default: 2048)
 #   [-v]              - be VERBOSE                                              (default: false)
 #
@@ -62,7 +62,7 @@ NEW_VM["NDEV"]="default"
 NEW_VM["DISK"]="50"
 NEW_VM["RAM"]="2048"
 NEW_VM["CPU"]="2"
-NEW_VM["OS"]="ubuntu"
+NEW_VM["OS"]="ubuntu22"
 NEW_VM["TMPDIR"]="/tmp/foo$$" # :FIXME: This should be trapped
 
 while getopts ":n:i:e:d:r:c:o:v" opt; do
@@ -132,7 +132,6 @@ set_static_default_device() {
 }
 
 ## Check if VM already exists
-# :TODO: - parse the xml and exact match the name
 check_existing_vm() {
   virsh -rq dominfo --domain ${NEW_VM["NAME"]} >/dev/null 2>&1 || EXIT_CODE=$?
   if [[ ${EXIT_CODE} -eq 0 ]]; then
@@ -145,9 +144,13 @@ check_existing_vm() {
 #
 set_os_variant() {
   case "${NEW_VM["OS"]}" in
-    ubuntu)
+    ubuntu20)
       NEW_VM["OS"]="ubuntu"
       NEW_VM["OS_VARIANT"]="ubuntu20.04"
+      ;;
+    ubuntu22)
+      NEW_VM["OS"]="ubuntu"
+      NEW_VM["OS_VARIANT"]="ubuntu20.04" # virt-install does not know about 22.04 yet
       ;;
     debian10)
       NEW_VM["OS"]="debian"
